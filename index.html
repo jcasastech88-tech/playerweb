@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reproductor Web</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-style: border-box;
+        }
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #000;
+            font-family: Arial, sans-serif;
+        }
+        .container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+        }
+        iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+        .error-msg {
+            color: #fff;
+            text-align: center;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div id="error" class="error-msg">
+            <h2>Error: No se proporcionó un enlace válido o el código es incorrecto.</h2>
+        </div>
+        <iframe id="player" allowfullscreen allow="autoplay; encrypted-media"></iframe>
+    </div>
+
+    <script>
+        function ordenarYEjecutar() {
+            // Captura todo lo que está después del '#' en la URL
+            const hash = window.location.hash.substring(1);
+            const iframe = document.getElementById('player');
+            const errorDiv = document.getElementById('error');
+
+            if (hash) {
+                try {
+                    // Decodifica el Base64
+                    const urlReal = atob(hash);
+                    
+                    // Validar si es una URL válida básica
+                    if (urlReal.startsWith('http://') || urlReal.startsWith('https://')) {
+                        iframe.src = urlReal;
+                        iframe.style.display = 'block';
+                    } else {
+                        throw new Error("URL no válida");
+                    }
+                } catch (e) {
+                    // Si falla la decodificación o no es URL
+                    iframe.style.display = 'none';
+                    errorDiv.style.display = 'block';
+                }
+            } else {
+                iframe.style.display = 'none';
+                errorDiv.style.display = 'block';
+                errorDiv.innerHTML = "<h2>Esperando código de video...</h2>";
+            }
+        }
+
+        // Ejecutar al cargar la página
+        window.onload = ordenarYEjecutar;
+        // Ejecutar si el hash cambia sin recargar la página
+        window.onhashchange = ordenarYEjecutar;
+    </script>
+
+</body>
+</html>
