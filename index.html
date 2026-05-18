@@ -177,33 +177,30 @@
         let urlDecodificada = "";
 
         async function inicializar() {
-    // 1. Limpiamos el hash eliminando el '#' si existe
-    const hashRaw = window.location.hash.replace('#', '');
-    if (!hashRaw) {
-        mostrarError("Esperando parámetros de reproducción.");
-        return;
-    }
+    const hashRaw = window.location.hash.substring(1);
+    // Cambiamos el separador de '/' a '-' para evitar conflictos con Base64
+    const partes = hashRaw.split('-'); 
 
-    const partes = hashRaw.split('/');
-    
-    // El enlace Base64 SIEMPRE va a ser la última parte de la URL
-    const base64Url = partes[partes.length - 1]; 
-    const tipo = partes[0]; // 'movie' o 'tv'
-    const tmdbId = partes[1]; // ID de TMDB
-
-    // Caso A: Es un capítulo específico de una serie (tv/id/temporada/episodio/base64) -> Tiene 5 partes
-    if (tipo === 'tv' && partes.length === 5) {
-        const temporada = partes[2];
-        const episodio = partes[3];
+    // Caso 1: Es un capítulo específico (tv-id-temporada-episodio-base64) -> Tiene 5 partes
+    if (partes.length === 5) {
+        const tipo = partes[0];      // 'tv'
+        const tmdbId = partes[1];    // ID serie
+        const temporada = partes[2]; // Num temporada
+        const episodio = partes[3];  // Num episodio
+        const base64Url = partes[4]; // Enlace cifrado
 
         procesarParametros(base64Url, () => obtenerDatosEpisodioTMDB(tmdbId, temporada, episodio));
     } 
-    // Caso B: Es una Película (movie/id/base64) o Serie Completa (tv/id/base64) -> Tiene 3 partes
-    else if ((tipo === 'movie' || tipo === 'tv') && partes.length === 3) {
+    // Caso 2: Es película o serie general (movie o tv - id - base64) -> Tiene 3 partes
+    else if (partes.length === 3) {
+        const tipo = partes[0];      // 'movie' o 'tv'
+        const tmdbId = partes[1];    // ID
+        const base64Url = partes[2]; // Enlace cifrado
+
         procesarParametros(base64Url, () => obtenerDatosGeneralesTMDB(tipo, tmdbId));
     } 
     else {
-        mostrarError("Estructura de enlace no válida. Verifica el formato.");
+        mostrarError("Estructura de enlace no reconocida.");
     }
 }
 
