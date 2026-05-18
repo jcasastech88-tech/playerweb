@@ -8,32 +8,104 @@
         * {
             margin: 0;
             padding: 0;
-            box-style: border-box;
+            box-sizing: border-box;
         }
         body, html {
             width: 100%;
             height: 100%;
             overflow: hidden;
-            background-color: #000;
-            font-family: Arial, sans-serif;
+            background-color: #050505;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
         .container {
             position: relative;
             width: 100%;
             height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
         }
         iframe {
             width: 100%;
             height: 100%;
             border: none;
+            display: none; /* Oculto al principio */
         }
-        .error-msg {
-            color: #fff;
-            text-align: center;
+        
+        /* Pantalla de Bienvenida / Play */
+        .overlay-screen {
             position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle, #1a1a1a 0%, #050505 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+            transition: opacity 0.5s ease;
+        }
+
+        /* Botón de Play estilo Stream */
+        .play-btn {
+            width: 90px;
+            height: 90px;
+            background: #ff0055; /* Color llamativo, puedes cambiarlo */
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            box-shadow: 0 0 25px rgba(255, 0, 85, 0.6);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .play-btn:hover {
+            transform: scale(1.1);
+            box-shadow: 0 0 35px rgba(255, 0, 85, 0.9);
+        }
+        /* Triángulo del Play */
+        .play-icon {
+            width: 0;
+            height: 0;
+            border-top: 15px solid transparent;
+            border-bottom: 15px solid transparent;
+            border-left: 25px solid #fff;
+            margin-left: 8px;
+        }
+
+        /* Texto de estado */
+        .status-text {
+            color: #ffffff;
+            margin-top: 25px;
+            font-size: 1.2rem;
+            font-weight: 500;
+            letter-spacing: 1px;
+            text-align: center;
+            min-height: 30px;
+        }
+
+        /* Animación simple de carga (Spinner) */
+        .spinner {
+            display: none;
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(255,255,255,0.1);
+            border-radius: 50%;
+            border-top-color: #ff0055;
+            animation: spin 1s ease-in-out infinite;
+            margin-bottom: 15px;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Mensajes de Error */
+        .error-msg {
+            color: #ff4444;
+            text-align: center;
+            padding: 20px;
             display: none;
         }
     </style>
@@ -41,47 +113,100 @@
 <body>
 
     <div class="container">
-        <div id="error" class="error-msg">
-            <h2>Error: No se proporcionó un enlace válido o el código es incorrecto.</h2>
+        <div id="overlay" class="overlay-screen">
+            <div id="spinner" class="spinner"></div>
+            
+            <div id="playContainer" onclick="procesarVideo()">
+                <div class="play-btn">
+                    <div class="play-icon"></div>
+                </div>
+            </div>
+
+            <div id="status" class="status-text">Reproducir Video</div>
+            
+            <div id="error" class="error-msg">
+                <h2>Error: Enlace no válido o corrupto.</h2>
+            </div>
         </div>
-        <iframe id="player" allowfullscreen allow="autoplay; encrypted-media"></iframe>
+
+        <iframe id="player" allowfullscreen allow="autoplay; encrypted-media; picture-in-picture"></iframe>
     </div>
 
     <script>
-        function ordenarYEjecutar() {
-            // Captura todo lo que está después del '#' en la URL
+        let urlDecodificada = "";
+
+        // Al cargar la página, solo decodifica y valida, pero NO carga el iframe aún
+        function inicializar() {
             const hash = window.location.hash.substring(1);
-            const iframe = document.getElementById('player');
+            const playContainer = document.getElementById('playContainer');
+            const statusText = document.getElementById('status');
             const errorDiv = document.getElementById('error');
 
             if (hash) {
                 try {
-                    // Decodifica el Base64
+                    // Descifrar Base64
                     const urlReal = atob(hash);
                     
-                    // Validar si es una URL válida básica
                     if (urlReal.startsWith('http://') || urlReal.startsWith('https://')) {
-                        iframe.src = urlReal;
-                        iframe.style.display = 'block';
+                        urlDecodificada = urlReal; // Guardamos la URL en memoria
+                        playContainer.style.display = 'flex';
+                        statusText.innerText = "Video listo. Haz clic para reproducir";
                     } else {
-                        throw new Error("URL no válida");
+                        throw new Error();
                     }
                 } catch (e) {
-                    // Si falla la decodificación o no es URL
-                    iframe.style.display = 'none';
-                    errorDiv.style.display = 'block';
+                    mostrarError();
                 }
             } else {
-                iframe.style.display = 'none';
-                errorDiv.style.display = 'block';
-                errorDiv.innerHTML = "<h2>Esperando código de video...</h2>";
+                playContainer.style.display = 'none';
+                statusText.innerText = "Esperando código de video...";
             }
         }
 
-        // Ejecutar al cargar la página
-        window.onload = ordenarYEjecutar;
-        // Ejecutar si el hash cambia sin recargar la página
-        window.onhashchange = ordenarYEjecutar;
+        // Se ejecuta al presionar el botón de Play
+        function procesarVideo() {
+            if (!urlDecodificada) return;
+
+            const playContainer = document.getElementById('playContainer');
+            const statusText = document.getElementById('status');
+            const spinner = document.getElementById('spinner');
+            const overlay = document.getElementById('overlay');
+            const iframe = document.getElementById('player');
+
+            // 1. Ocultar botón y mostrar carga
+            playContainer.style.display = 'none';
+            spinner.style.display = 'block';
+            statusText.innerText = "Generando enlace seguro...";
+
+            // 2. Simular una pequeña espera (1.5 segundos) para que parezca un proceso del servidor
+            setTimeout(() => {
+                statusText.innerText = "Cargando reproductor...";
+                
+                // Inyectar la URL real en el iframe
+                iframe.src = urlDecodificada;
+                iframe.style.display = 'block';
+
+                // 3. Desvanecer la pantalla de carga suavemente
+                overlay.style.opacity = '0';
+                setTimeout(() => {
+                    overlay.style.display = 'none'; // Eliminar del flujo de la página
+                }, 500);
+
+            }, 1500); // 1500 milisegundos = 1.5 segundos
+        }
+
+        function mostrarError() {
+            document.getElementById('playContainer').style.display = 'none';
+            document.getElementById('spinner').style.display = 'none';
+            document.getElementById('status').style.display = 'none';
+            document.getElementById('error').style.display = 'block';
+        }
+
+        window.onload = inicializar;
+        window.onhashchange = () => {
+            // Si cambian el hash, recargamos la lógica para evitar bugs
+            location.reload();
+        };
     </script>
 
 </body>
