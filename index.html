@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Reproductor Seguro</title>
+    <title>Reproductor Pro</title>
     <style>
         * {
             margin: 0;
@@ -33,7 +33,6 @@
             z-index: 1;
         }
         
-        /* Pantalla de Carga con Backdrop */
         .overlay-screen {
             position: absolute;
             top: 0;
@@ -46,10 +45,9 @@
             align-items: center;
             z-index: 10;
             transition: opacity 0.5s ease;
-            background: rgba(5, 5, 5, 0.85); /* Capa oscura encima del fondo */
+            background: rgba(5, 5, 5, 0.85);
         }
 
-        /* Fondo dinámico difuminado */
         .backdrop-bg {
             position: absolute;
             top: 0;
@@ -59,23 +57,29 @@
             background-size: cover;
             background-position: center;
             filter: blur(15px) brightness(0.4);
-            transform: scale(1.1); /* Evita bordes blancos por el blur */
+            transform: scale(1.1);
             z-index: -1;
         }
 
-        /* Detalles del contenido */
         .meta-content {
             text-align: center;
             color: #fff;
             margin-bottom: 30px;
-            max-width: 80%;
+            max-width: 85%;
             animation: fadeIn 0.8s ease;
         }
         .media-title {
-            font-size: 2rem;
+            font-size: 2.2rem;
             font-weight: bold;
             text-shadow: 0 2px 10px rgba(0,0,0,0.8);
-            margin-bottom: 10px;
+            margin-bottom: 5px;
+        }
+        .episode-title {
+            font-size: 1.2rem;
+            color: #cccccc;
+            margin-bottom: 15px;
+            font-weight: 400;
+            text-shadow: 0 2px 8px rgba(0,0,0,0.8);
         }
         .badges {
             display: flex;
@@ -86,14 +90,14 @@
         .badge-lang {
             background: #00aa66;
             color: white;
-            padding: 4px 10px;
+            padding: 4px 12px;
             border-radius: 4px;
             font-size: 0.85rem;
             font-weight: bold;
             text-transform: uppercase;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
         }
 
-        /* Botón de Play */
         .play-btn {
             width: 90px;
             height: 90px;
@@ -144,14 +148,12 @@
 
     <div class="container">
         <div id="overlay" class="overlay-screen">
-            <!-- Imagen de fondo que cambiará dinámicamente -->
             <div id="backdrop" class="backdrop-bg"></div>
-
             <div id="spinner" class="spinner"></div>
             
-            <!-- Bloque de título y badges -->
             <div id="metaContent" class="meta-content" style="display: none;">
                 <h1 id="mediaTitle" class="media-title">Cargando...</h1>
+                <div id="episodeTitle" class="episode-title" style="display: none;"></div>
                 <div class="badges">
                     <span class="badge-lang">Español</span>
                 </div>
@@ -171,65 +173,107 @@
     </div>
 
     <script>
-        // REEMPLAZA ESTO CON TU API KEY DE TMDB
-        const TMDB_API_KEY = '51800c8d9e13631a7ded6f17f363e7a5'; 
+        const TMDB_API_KEY = 'TU_API_KEY_AQUÍ'; // Pon tu clave de TMDB aquí
         let urlDecodificada = "";
 
         async function inicializar() {
-            // Captura el hash completo: tipo/id/base64
             const hashRaw = window.location.hash.substring(1);
             const partes = hashRaw.split('/');
 
-            if (partes.length >= 3) {
+            // Caso 1: Es un capítulo específico (tv/id/temporada/episodio/base64) -> Tiene 5 partes
+            if (partes.length === 5) {
+                const tipo = partes[0];      // 'tv'
+                const tmdbId = partes[1];    // ID serie
+                const temporada = partes[2]; // Num temporada
+                const episodio = partes[3];  // Num episodio
+                const base64Url = partes[4]; // Enlace cifrado
+
+                procesarParametros(base64Url, () => obtenerDatosEpisodioTMDB(tmdbId, temporada, episodio));
+            } 
+            // Caso 2: Es película o serie general (movie o tv / id / base64) -> Tiene 3 partes
+            else if (partes.length === 3) {
                 const tipo = partes[0];      // 'movie' o 'tv'
-                const tmdbId = partes[1];    // ID numérico
+                const tmdbId = partes[1];    // ID
                 const base64Url = partes[2]; // Enlace cifrado
 
-                try {
-                    // 1. Decodificar URL del video
-                    const urlReal = atob(base64Url);
-                    if (urlReal.startsWith('http://') || urlReal.startsWith('https://')) {
-                        urlDecodificada = urlReal;
-                    } else { throw new Error(); }
-
-                    // 2. Consultar la API de TMDB en español
-                    await obtenerDatosTMDB(tipo, tmdbId);
-
-                    // Mostrar interfaz de Play
-                    document.getElementById('playContainer').style.display = 'flex';
-                    document.getElementById('metaContent').style.display = 'block';
-                    document.getElementById('status').innerText = "Haz clic para reproducir";
-
-                } catch (e) {
-                    mostrarError();
-                }
-            } else {
-                mostrarError("Faltan parámetros en el reproductor.");
+                procesarParametros(base64Url, () => obtenerDatosGeneralesTMDB(tipo, tmdbId));
+            } 
+            else {
+                mostrarError("Estructura de enlace no reconocida.");
             }
         }
 
-        async function obtenerDatosTMDB(tipo, id) {
-            const urlFetch = `https://api.themoviedb.org/3/${tipo}/${id}?api_key=${TMDB_API_KEY}&language=es-ES`;
-            
+        function procesarParametros(base64Url, funcionTMDB) {
             try {
-                const respuesta = await fetch(urlFetch);
-                if (!respuesta.ok) return; // Si falla la API continúa con diseño genérico
-                
+                const urlReal = atob(base64Url);
+                if (urlReal.startsWith('http://') || urlReal.startsWith('https://')) {
+                    urlDecodificada = urlReal;
+                } else { throw new Error(); }
+
+                // Ejecuta la consulta a TMDB que corresponda
+                funcionTMDB().then(() => {
+                    document.getElementById('playContainer').style.display = 'flex';
+                    document.getElementById('metaContent').style.display = 'block';
+                    document.getElementById('status').innerText = "Haz clic para reproducir";
+                });
+
+            } catch (e) {
+                mostrarError();
+            }
+        }
+
+        // Consulta para Películas o Series generales
+        async function obtenerDatosGeneralesTMDB(tipo, id) {
+            const url = `https://api.themoviedb.org/3/${tipo}/${id}?api_key=${TMDB_API_KEY}&language=es-ES`;
+            try {
+                const respuesta = await fetch(url);
+                if (!respuesta.ok) return;
                 const datos = await respuesta.json();
                 
-                // Extraer título (las películas usan 'title', las series usan 'name')
-                const titulo = datos.title || datos.name;
-                const backdropPath = datos.backdrop_path;
+                document.getElementById('mediaTitle').innerText = datos.title || datos.name;
+                if (datos.backdrop_path) {
+                    document.getElementById('backdrop').style.backgroundImage = `url('https://image.tmdb.org/t/p/w1280${datos.backdrop_path}')`;
+                }
+            } catch (error) { console.log(error); }
+        }
 
-                if (titulo) {
-                    document.getElementById('mediaTitle').innerText = titulo;
+        // Consulta específica para un Capítulo
+        async function obtenerDatosEpisodioTMDB(idSerie, temp, ep) {
+            // Buscamos primero los datos del capítulo
+            const urlEpisodio = `https://api.themoviedb.org/3/tv/${idSerie}/season/${temp}/episode/${ep}?api_key=${TMDB_API_KEY}&language=es-ES`;
+            // Buscamos también la serie para heredar el Backdrop (fondo) principal
+            const urlSerie = `https://api.themoviedb.org/3/tv/${idSerie}?api_key=${TMDB_API_KEY}&language=es-ES`;
+
+            try {
+                const [resEp, resSerie] = await Promise.all([fetch(urlEpisodio), fetch(urlSerie)]);
+                
+                if (resEp.ok) {
+                    const datosEp = await resEp.json();
+                    // Ejemplo: "Temporada 1 - Episodio 5"
+                    document.getElementById('mediaTitle').innerText = `T${temp} × E${ep}`;
+                    // Subtítulo: El nombre del capítulo ("Nombre del capítulo")
+                    if(datosEp.name) {
+                        const epTitleDiv = document.getElementById('episodeTitle');
+                        epTitleDiv.innerText = datosEp.name;
+                        epTitleDiv.style.display = 'block';
+                    }
                 }
-                if (backdropPath) {
-                    document.getElementById('backdrop').style.backgroundImage = `url('https://image.tmdb.org/t/p/w1280${backdropPath}')`;
+                
+                if (resSerie.ok) {
+                    const datosSerie = await resSerie.json();
+                    // Si el capítulo no cargó el título por algún motivo, usamos el de la serie
+                    if (document.getElementById('mediaTitle').innerText === "Cargando...") {
+                        document.getElementById('mediaTitle').innerText = datosSerie.name;
+                    } else {
+                        // Si ya tiene el "T1 x E5", le añadimos el nombre de la serie al principio
+                        document.getElementById('mediaTitle').innerText = `${datosSerie.name} (${document.getElementById('mediaTitle').innerText})`;
+                    }
+
+                    if (datosSerie.backdrop_path) {
+                        document.getElementById('backdrop').style.backgroundImage = `url('https://image.tmdb.org/t/p/w1280${datosSerie.backdrop_path}')`;
+                    }
                 }
-            } catch (error) {
-                console.log("Error consultando TMDB, usando diseño por defecto.");
-            }
+            } catch (error) { console.log(error); }
         }
 
         function procesarVideo() {
