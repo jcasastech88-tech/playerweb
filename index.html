@@ -204,23 +204,34 @@
         }
 
         function procesarParametros(base64Url, funcionTMDB) {
-            try {
-                const urlReal = atob(base64Url);
-                if (urlReal.startsWith('http://') || urlReal.startsWith('https://')) {
-                    urlDecodificada = urlReal;
-                } else { throw new Error(); }
-
-                // Ejecuta la consulta a TMDB que corresponda
-                funcionTMDB().then(() => {
-                    document.getElementById('playContainer').style.display = 'flex';
-                    document.getElementById('metaContent').style.display = 'block';
-                    document.getElementById('status').innerText = "Haz clic para reproducir";
-                });
-
-            } catch (e) {
-                mostrarError();
-            }
+    try {
+        // Intentamos decodificar el Base64 de forma segura
+        const urlReal = atob(base64Url);
+        if (urlReal.startsWith('http://') || urlReal.startsWith('https://')) {
+            urlDecodificada = urlReal;
+        } else { 
+            throw new Error("Formato de URL inválido al decodificar"); 
         }
+
+        // Si el enlace está bien, procedemos a buscar en TMDB
+        funcionTMDB().then(() => {
+            document.getElementById('playContainer').style.display = 'flex';
+            document.getElementById('metaContent').style.display = 'block';
+            document.getElementById('status').innerText = "Haz clic para reproducir";
+        }).catch(() => {
+            // Si falla la API de TMDB, igual permitimos reproducir con diseño genérico
+            document.getElementById('mediaTitle').innerText = "Video Disponible";
+            document.getElementById('playContainer').style.display = 'flex';
+            document.getElementById('metaContent').style.display = 'block';
+            document.getElementById('status').innerText = "Haz clic para reproducir";
+        });
+
+    } catch (e) {
+        // Si el Base64 está corrupto, saltamos directo al error en vez de congelar la pantalla
+        console.error("Error en Base64:", e);
+        mostrarError("El enlace de video está corrupto o incompleto.");
+    }
+}
 
         // Consulta para Películas o Series generales
         async function obtenerDatosGeneralesTMDB(tipo, id) {
