@@ -177,49 +177,53 @@
         let urlDecodificada = "";
 
         async function inicializar() {
-            const hashRaw = window.location.hash.substring(1);
-            const partes = hashRaw.split('/');
+    // 1. Limpiamos el hash eliminando el '#' si existe
+    const hashRaw = window.location.hash.replace('#', '');
+    if (!hashRaw) {
+        mostrarError("Esperando parámetros de reproducción.");
+        return;
+    }
 
-            // Caso 1: Es un capítulo específico (tv/id/temporada/episodio/base64) -> Tiene 5 partes
-            if (partes.length === 5) {
-                const tipo = partes[0];      // 'tv'
-                const tmdbId = partes[1];    // ID serie
-                const temporada = partes[2]; // Num temporada
-                const episodio = partes[3];  // Num episodio
-                const base64Url = partes[4]; // Enlace cifrado
+    const partes = hashRaw.split('/');
+    
+    // El enlace Base64 SIEMPRE va a ser la última parte de la URL
+    const base64Url = partes[partes.length - 1]; 
+    const tipo = partes[0]; // 'movie' o 'tv'
+    const tmdbId = partes[1]; // ID de TMDB
 
-                procesarParametros(base64Url, () => obtenerDatosEpisodioTMDB(tmdbId, temporada, episodio));
-            } 
-            // Caso 2: Es película o serie general (movie o tv / id / base64) -> Tiene 3 partes
-            else if (partes.length === 3) {
-                const tipo = partes[0];      // 'movie' o 'tv'
-                const tmdbId = partes[1];    // ID
-                const base64Url = partes[2]; // Enlace cifrado
+    // Caso A: Es un capítulo específico de una serie (tv/id/temporada/episodio/base64) -> Tiene 5 partes
+    if (tipo === 'tv' && partes.length === 5) {
+        const temporada = partes[2];
+        const episodio = partes[3];
 
-                procesarParametros(base64Url, () => obtenerDatosGeneralesTMDB(tipo, tmdbId));
-            } 
-            else {
-                mostrarError("Estructura de enlace no reconocida.");
-            }
-        }
+        procesarParametros(base64Url, () => obtenerDatosEpisodioTMDB(tmdbId, temporada, episodio));
+    } 
+    // Caso B: Es una Película (movie/id/base64) o Serie Completa (tv/id/base64) -> Tiene 3 partes
+    else if ((tipo === 'movie' || tipo === 'tv') && partes.length === 3) {
+        procesarParametros(base64Url, () => obtenerDatosGeneralesTMDB(tipo, tmdbId));
+    } 
+    else {
+        mostrarError("Estructura de enlace no válida. Verifica el formato.");
+    }
+}
 
-        function procesarParametros(base64Url, funcionTMDB) {
+function procesarParametros(base64Url, funcionTMDB) {
     try {
-        // Intentamos decodificar el Base64 de forma segura
+        // Decodificar Base64 de forma segura
         const urlReal = atob(base64Url);
         if (urlReal.startsWith('http://') || urlReal.startsWith('https://')) {
             urlDecodificada = urlReal;
         } else { 
-            throw new Error("Formato de URL inválido al decodificar"); 
+            throw new Error(); 
         }
 
-        // Si el enlace está bien, procedemos a buscar en TMDB
+        // Ejecutar consulta a TMDB
         funcionTMDB().then(() => {
             document.getElementById('playContainer').style.display = 'flex';
             document.getElementById('metaContent').style.display = 'block';
             document.getElementById('status').innerText = "Haz clic para reproducir";
         }).catch(() => {
-            // Si falla la API de TMDB, igual permitimos reproducir con diseño genérico
+            // Si TMDB falla, igual permite reproducir
             document.getElementById('mediaTitle').innerText = "Video Disponible";
             document.getElementById('playContainer').style.display = 'flex';
             document.getElementById('metaContent').style.display = 'block';
@@ -227,8 +231,7 @@
         });
 
     } catch (e) {
-        // Si el Base64 está corrupto, saltamos directo al error en vez de congelar la pantalla
-        console.error("Error en Base64:", e);
+        console.error("Error decodificando el enlace:", e);
         mostrarError("El enlace de video está corrupto o incompleto.");
     }
 }
