@@ -2,21 +2,49 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Reproductor Pro</title>
     <style>
-        * {
+        *, *::before, *::after {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
-        body, html {
+
+        :root {
+            --accent: #ff0055;
+            --accent-glow: rgba(255, 0, 85, 0.6);
+            --accent-glow-strong: rgba(255, 0, 85, 0.9);
+            --bg: #050505;
+            --text: #ffffff;
+            --subtext: #cccccc;
+            --badge-bg: #00aa66;
+            --overlay-bg: rgba(5, 5, 5, 0.85);
+            --error: #ff4444;
+
+            /* Fluid type scale */
+            --fs-title: clamp(1.2rem, 5vw, 2.4rem);
+            --fs-ep: clamp(0.85rem, 2.5vw, 1.2rem);
+            --fs-status: clamp(0.8rem, 2.2vw, 1.1rem);
+            --fs-badge: clamp(0.7rem, 1.8vw, 0.85rem);
+
+            /* Fluid spacing */
+            --gap-meta: clamp(12px, 3vw, 30px);
+            --btn-size: clamp(60px, 14vw, 90px);
+            --btn-icon-top: clamp(8px, 2vw, 15px);
+            --btn-icon-bottom: clamp(8px, 2vw, 15px);
+            --btn-icon-left: clamp(14px, 3vw, 25px);
+            --btn-icon-margin: clamp(4px, 1.5vw, 8px);
+        }
+
+        html, body {
             width: 100%;
             height: 100%;
             overflow: hidden;
-            background-color: #050505;
+            background-color: var(--bg);
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
+
         .container {
             position: relative;
             width: 100%;
@@ -25,6 +53,7 @@
             justify-content: center;
             align-items: center;
         }
+
         iframe {
             width: 100%;
             height: 100%;
@@ -32,28 +61,24 @@
             display: none;
             z-index: 1;
         }
-        
+
+        /* ── Overlay ── */
         .overlay-screen {
             position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
+            inset: 0;
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
             z-index: 10;
             transition: opacity 0.5s ease;
-            background: rgba(5, 5, 5, 0.85);
+            background: var(--overlay-bg);
+            padding: clamp(16px, 5vw, 40px);
         }
 
         .backdrop-bg {
             position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
+            inset: 0;
             background-size: cover;
             background-position: center;
             filter: blur(15px) brightness(0.4);
@@ -61,87 +86,157 @@
             z-index: -1;
         }
 
+        /* ── Meta info ── */
         .meta-content {
             text-align: center;
-            color: #fff;
-            margin-bottom: 30px;
-            max-width: 85%;
+            color: var(--text);
+            margin-bottom: var(--gap-meta);
+            max-width: min(85%, 680px);
             animation: fadeIn 0.8s ease;
         }
+
         .media-title {
-            font-size: 2.2rem;
+            font-size: var(--fs-title);
             font-weight: bold;
             text-shadow: 0 2px 10px rgba(0,0,0,0.8);
-            margin-bottom: 5px;
+            margin-bottom: 6px;
+            line-height: 1.2;
+            word-break: break-word;
+            hyphens: auto;
         }
+
         .episode-title {
-            font-size: 1.2rem;
-            color: #cccccc;
-            margin-bottom: 15px;
+            font-size: var(--fs-ep);
+            color: var(--subtext);
+            margin-bottom: clamp(8px, 2vw, 15px);
             font-weight: 400;
             text-shadow: 0 2px 8px rgba(0,0,0,0.8);
+            word-break: break-word;
+            line-height: 1.4;
         }
+
         .badges {
             display: flex;
-            gap: 10px;
+            gap: clamp(6px, 1.5vw, 10px);
             justify-content: center;
             align-items: center;
+            flex-wrap: wrap;
         }
+
         .badge-lang {
-            background: #00aa66;
+            background: var(--badge-bg);
             color: white;
-            padding: 4px 12px;
+            padding: clamp(3px, 0.8vw, 4px) clamp(8px, 2.5vw, 12px);
             border-radius: 4px;
-            font-size: 0.85rem;
+            font-size: var(--fs-badge);
             font-weight: bold;
             text-transform: uppercase;
             box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            white-space: nowrap;
+        }
+
+        /* ── Play button ── */
+        #playContainer {
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
         }
 
         .play-btn {
-            width: 90px;
-            height: 90px;
-            background: #ff0055;
+            width: var(--btn-size);
+            height: var(--btn-size);
+            background: var(--accent);
             border-radius: 50%;
             display: flex;
             justify-content: center;
             align-items: center;
-            cursor: pointer;
-            box-shadow: 0 0 25px rgba(255, 0, 85, 0.6);
+            box-shadow: 0 0 25px var(--accent-glow);
             transition: transform 0.2s ease, box-shadow 0.2s ease;
-        }
-        .play-btn:hover {
-            transform: scale(1.1);
-            box-shadow: 0 0 35px rgba(255, 0, 85, 0.9);
-        }
-        .play-icon {
-            width: 0; height: 0;
-            border-top: 15px solid transparent;
-            border-bottom: 15px solid transparent;
-            border-left: 25px solid #fff;
-            margin-left: 8px;
+            -webkit-tap-highlight-color: transparent;
         }
 
+        .play-btn:hover {
+            transform: scale(1.1);
+            box-shadow: 0 0 35px var(--accent-glow-strong);
+        }
+
+        /* Touch: active state instead of hover for mobile */
+        #playContainer:active .play-btn {
+            transform: scale(0.95);
+            box-shadow: 0 0 15px var(--accent-glow);
+        }
+
+        .play-icon {
+            width: 0;
+            height: 0;
+            border-top: var(--btn-icon-top) solid transparent;
+            border-bottom: var(--btn-icon-bottom) solid transparent;
+            border-left: var(--btn-icon-left) solid #fff;
+            margin-left: var(--btn-icon-margin);
+        }
+
+        /* ── Status / spinner / error ── */
         .status-text {
-            color: #ffffff;
-            margin-top: 25px;
-            font-size: 1.1rem;
+            color: var(--text);
+            margin-top: clamp(14px, 3.5vw, 25px);
+            font-size: var(--fs-status);
             text-shadow: 0 2px 5px rgba(0,0,0,0.5);
+            text-align: center;
         }
 
         .spinner {
             display: none;
-            width: 40px; height: 40px;
+            width: clamp(28px, 7vw, 40px);
+            height: clamp(28px, 7vw, 40px);
             border: 4px solid rgba(255,255,255,0.1);
             border-radius: 50%;
-            border-top-color: #ff0055;
+            border-top-color: var(--accent);
             animation: spin 1s linear infinite;
-            margin-bottom: 15px;
+            margin-bottom: clamp(10px, 2.5vw, 15px);
         }
 
-        @keyframes spin { to { transform: rotate(360deg); } }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
-        .error-msg { color: #ff4444; display: none; text-align: center; }
+        .error-msg {
+            color: var(--error);
+            display: none;
+            text-align: center;
+            font-size: clamp(0.85rem, 2.5vw, 1.1rem);
+            padding: 0 16px;
+        }
+
+        /* ── Animations ── */
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ── Portrait phones: tighter layout ── */
+        @media (max-width: 480px) and (orientation: portrait) {
+            .overlay-screen {
+                justify-content: center;
+                gap: 0;
+            }
+            .meta-content {
+                max-width: 92%;
+            }
+        }
+
+        /* ── Landscape phones: shrink vertical gaps ── */
+        @media (max-height: 420px) {
+            .overlay-screen {
+                justify-content: center;
+                padding-top: 10px;
+                padding-bottom: 10px;
+            }
+            .meta-content {
+                margin-bottom: 10px;
+            }
+            .status-text {
+                margin-top: 8px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -150,16 +245,16 @@
         <div id="overlay" class="overlay-screen">
             <div id="backdrop" class="backdrop-bg"></div>
             <div id="spinner" class="spinner"></div>
-            
-            <div id="metaContent" class="meta-content" style="display: none;">
+
+            <div id="metaContent" class="meta-content" style="display:none;">
                 <h1 id="mediaTitle" class="media-title">Cargando...</h1>
-                <div id="episodeTitle" class="episode-title" style="display: none;"></div>
+                <div id="episodeTitle" class="episode-title" style="display:none;"></div>
                 <div class="badges">
                     <span class="badge-lang">Español</span>
                 </div>
             </div>
 
-            <div id="playContainer" onclick="procesarVideo()" style="display: none;">
+            <div id="playContainer" onclick="procesarVideo()" style="display:none;">
                 <div class="play-btn">
                     <div class="play-icon"></div>
                 </div>
@@ -173,74 +268,56 @@
     </div>
 
     <script>
-        const TMDB_API_KEY = '51800c8d9e13631a7ded6f17f363e7a5'; // Pon tu clave de TMDB aquí
+        const TMDB_API_KEY = '51800c8d9e13631a7ded6f17f363e7a5';
         let urlDecodificada = "";
 
         async function inicializar() {
-    const hashRaw = window.location.hash.substring(1);
-    // Cambiamos el separador de '/' a '-' para evitar conflictos con Base64
-    const partes = hashRaw.split('-'); 
+            const hashRaw = window.location.hash.substring(1);
+            const partes = hashRaw.split('-');
 
-    // Caso 1: Es un capítulo específico (tv-id-temporada-episodio-base64) -> Tiene 5 partes
-    if (partes.length === 5) {
-        const tipo = partes[0];      // 'tv'
-        const tmdbId = partes[1];    // ID serie
-        const temporada = partes[2]; // Num temporada
-        const episodio = partes[3];  // Num episodio
-        const base64Url = partes[4]; // Enlace cifrado
-
-        procesarParametros(base64Url, () => obtenerDatosEpisodioTMDB(tmdbId, temporada, episodio));
-    } 
-    // Caso 2: Es película o serie general (movie o tv - id - base64) -> Tiene 3 partes
-    else if (partes.length === 3) {
-        const tipo = partes[0];      // 'movie' o 'tv'
-        const tmdbId = partes[1];    // ID
-        const base64Url = partes[2]; // Enlace cifrado
-
-        procesarParametros(base64Url, () => obtenerDatosGeneralesTMDB(tipo, tmdbId));
-    } 
-    else {
-        mostrarError("Estructura de enlace no reconocida.");
-    }
-}
-
-function procesarParametros(base64Url, funcionTMDB) {
-    try {
-        // Decodificar Base64 de forma segura
-        const urlReal = atob(base64Url);
-        if (urlReal.startsWith('http://') || urlReal.startsWith('https://')) {
-            urlDecodificada = urlReal;
-        } else { 
-            throw new Error(); 
+            if (partes.length === 5) {
+                const [tipo, tmdbId, temporada, episodio, base64Url] = partes;
+                procesarParametros(base64Url, () => obtenerDatosEpisodioTMDB(tmdbId, temporada, episodio));
+            } else if (partes.length === 3) {
+                const [tipo, tmdbId, base64Url] = partes;
+                procesarParametros(base64Url, () => obtenerDatosGeneralesTMDB(tipo, tmdbId));
+            } else {
+                mostrarError("Estructura de enlace no reconocida.");
+            }
         }
 
-        // Ejecutar consulta a TMDB
-        funcionTMDB().then(() => {
-            document.getElementById('playContainer').style.display = 'flex';
-            document.getElementById('metaContent').style.display = 'block';
-            document.getElementById('status').innerText = "Haz clic para reproducir";
-        }).catch(() => {
-            // Si TMDB falla, igual permite reproducir
-            document.getElementById('mediaTitle').innerText = "Video Disponible";
-            document.getElementById('playContainer').style.display = 'flex';
-            document.getElementById('metaContent').style.display = 'block';
-            document.getElementById('status').innerText = "Haz clic para reproducir";
-        });
+        function procesarParametros(base64Url, funcionTMDB) {
+            try {
+                const urlReal = atob(base64Url);
+                if (urlReal.startsWith('http://') || urlReal.startsWith('https://')) {
+                    urlDecodificada = urlReal;
+                } else {
+                    throw new Error();
+                }
 
-    } catch (e) {
-        console.error("Error decodificando el enlace:", e);
-        mostrarError("El enlace de video está corrupto o incompleto.");
-    }
-}
+                funcionTMDB().then(() => {
+                    document.getElementById('playContainer').style.display = 'flex';
+                    document.getElementById('metaContent').style.display = 'block';
+                    document.getElementById('status').innerText = "Haz clic para reproducir";
+                }).catch(() => {
+                    document.getElementById('mediaTitle').innerText = "Video Disponible";
+                    document.getElementById('playContainer').style.display = 'flex';
+                    document.getElementById('metaContent').style.display = 'block';
+                    document.getElementById('status').innerText = "Haz clic para reproducir";
+                });
 
-        // Consulta para Películas o Series generales
+            } catch (e) {
+                console.error("Error decodificando el enlace:", e);
+                mostrarError("El enlace de video está corrupto o incompleto.");
+            }
+        }
+
         async function obtenerDatosGeneralesTMDB(tipo, id) {
             const url = `https://api.themoviedb.org/3/${tipo}/${id}?api_key=${TMDB_API_KEY}&language=es-ES`;
             try {
                 const respuesta = await fetch(url);
                 if (!respuesta.ok) return;
                 const datos = await respuesta.json();
-                
                 document.getElementById('mediaTitle').innerText = datos.title || datos.name;
                 if (datos.backdrop_path) {
                     document.getElementById('backdrop').style.backgroundImage = `url('https://image.tmdb.org/t/p/w1280${datos.backdrop_path}')`;
@@ -248,38 +325,28 @@ function procesarParametros(base64Url, funcionTMDB) {
             } catch (error) { console.log(error); }
         }
 
-        // Consulta específica para un Capítulo
         async function obtenerDatosEpisodioTMDB(idSerie, temp, ep) {
-            // Buscamos primero los datos del capítulo
             const urlEpisodio = `https://api.themoviedb.org/3/tv/${idSerie}/season/${temp}/episode/${ep}?api_key=${TMDB_API_KEY}&language=es-ES`;
-            // Buscamos también la serie para heredar el Backdrop (fondo) principal
-            const urlSerie = `https://api.themoviedb.org/3/tv/${idSerie}?api_key=${TMDB_API_KEY}&language=es-ES`;
-
+            const urlSerie    = `https://api.themoviedb.org/3/tv/${idSerie}?api_key=${TMDB_API_KEY}&language=es-ES`;
             try {
                 const [resEp, resSerie] = await Promise.all([fetch(urlEpisodio), fetch(urlSerie)]);
-                
                 if (resEp.ok) {
                     const datosEp = await resEp.json();
-                    // Ejemplo: "Temporada 1 - Episodio 5"
                     document.getElementById('mediaTitle').innerText = `T${temp} × E${ep}`;
-                    // Subtítulo: El nombre del capítulo ("Nombre del capítulo")
-                    if(datosEp.name) {
+                    if (datosEp.name) {
                         const epTitleDiv = document.getElementById('episodeTitle');
                         epTitleDiv.innerText = datosEp.name;
                         epTitleDiv.style.display = 'block';
                     }
                 }
-                
                 if (resSerie.ok) {
                     const datosSerie = await resSerie.json();
-                    // Si el capítulo no cargó el título por algún motivo, usamos el de la serie
-                    if (document.getElementById('mediaTitle').innerText === "Cargando...") {
-                        document.getElementById('mediaTitle').innerText = datosSerie.name;
+                    const titleEl = document.getElementById('mediaTitle');
+                    if (titleEl.innerText === "Cargando...") {
+                        titleEl.innerText = datosSerie.name;
                     } else {
-                        // Si ya tiene el "T1 x E5", le añadimos el nombre de la serie al principio
-                        document.getElementById('mediaTitle').innerText = `${datosSerie.name} (${document.getElementById('mediaTitle').innerText})`;
+                        titleEl.innerText = `${datosSerie.name} (${titleEl.innerText})`;
                     }
-
                     if (datosSerie.backdrop_path) {
                         document.getElementById('backdrop').style.backgroundImage = `url('https://image.tmdb.org/t/p/w1280${datosSerie.backdrop_path}')`;
                     }
@@ -289,19 +356,16 @@ function procesarParametros(base64Url, funcionTMDB) {
 
         function procesarVideo() {
             if (!urlDecodificada) return;
-
             document.getElementById('playContainer').style.display = 'none';
             document.getElementById('metaContent').style.display = 'none';
             document.getElementById('spinner').style.display = 'block';
             document.getElementById('status').innerText = "Generando entorno seguro...";
 
             setTimeout(() => {
-                const iframe = document.getElementById('player');
+                const iframe  = document.getElementById('player');
                 const overlay = document.getElementById('overlay');
-                
                 iframe.src = urlDecodificada;
                 iframe.style.display = 'block';
-
                 overlay.style.opacity = '0';
                 setTimeout(() => { overlay.style.display = 'none'; }, 500);
             }, 1300);
@@ -312,7 +376,7 @@ function procesarParametros(base64Url, funcionTMDB) {
             document.getElementById('metaContent').style.display = 'none';
             document.getElementById('spinner').style.display = 'none';
             document.getElementById('status').style.display = 'none';
-            if(msg) document.getElementById('error').innerHTML = `<h2>${msg}</h2>`;
+            if (msg) document.getElementById('error').innerHTML = `<h2>${msg}</h2>`;
             document.getElementById('error').style.display = 'block';
         }
 
