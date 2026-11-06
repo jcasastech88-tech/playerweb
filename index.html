@@ -1,388 +1,601 @@
- <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="color-scheme" content="dark">
+    <meta name="theme-color" content="#050505">
     <script disable-devtool-auto="true" src="https://cdn.jsdelivr.net/npm/disable-devtool"></script>
     <title>Reproductor Pro Cinewick</title>
     <link rel="icon" type="image/png" href="fav.png">
+    <link rel="preconnect" href="https://api.themoviedb.org">
+    <link rel="preconnect" href="https://image.tmdb.org" crossorigin>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
-        *, *::before, *::after {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
         :root {
-            --accent: #ff0055;
-            --accent-glow: rgba(255, 0, 85, 0.6);
-            --accent-glow-strong: rgba(255, 0, 85, 0.9);
+            --accent: #00e5c8;          /* color principal (el tema puede mandar otro con ?c=RRGGBB) */
+            --accent-rgb: 0, 229, 200;
             --bg: #050505;
             --text: #ffffff;
-            --subtext: #cccccc;
-            --badge-bg: #00aa66;
-            --overlay-bg: rgba(5, 5, 5, 0.85);
-            --error: #ff4444;
+            --muted: rgba(255, 255, 255, .74);
+            --error: #ff5d5d;
 
-            /* Fluid type scale */
-            --fs-title: clamp(1.2rem, 5vw, 2.4rem);
-            --fs-ep: clamp(0.85rem, 2.5vw, 1.2rem);
-            --fs-status: clamp(0.8rem, 2.2vw, 1.1rem);
-            --fs-badge: clamp(0.7rem, 1.8vw, 0.85rem);
-
-            /* Fluid spacing */
-            --gap-meta: clamp(12px, 3vw, 30px);
-            --btn-size: clamp(60px, 14vw, 90px);
-            --btn-icon-top: clamp(8px, 2vw, 15px);
-            --btn-icon-bottom: clamp(8px, 2vw, 15px);
-            --btn-icon-left: clamp(14px, 3vw, 25px);
-            --btn-icon-margin: clamp(4px, 1.5vw, 8px);
+            /* Todo escala con el alto del propio reproductor */
+            --pb: clamp(50px, 17vh, 92px);
+            --gap: clamp(5px, 1.7vh, 15px);
+            --fs-title: clamp(1.15rem, 6.4vh, 2.7rem);
+            --fs-chip: clamp(.62rem, 2.5vh, .82rem);
+            --fs-syn: clamp(.78rem, 2.7vh, 1rem);
         }
 
         html, body {
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-            background-color: var(--bg);
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            width: 100%; height: 100%; overflow: hidden; background: var(--bg); color: var(--text);
+            font-family: 'DM Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+            -webkit-font-smoothing: antialiased;
         }
 
-        .container {
-            position: relative;
-            width: 100%;
-            height: 100%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
+        #player {
+            position: absolute; inset: 0; width: 100%; height: 100%;
+            border: 0; display: none; z-index: 1; background: #000;
         }
 
-        iframe {
-            width: 100%;
-            height: 100%;
-            border: none;
-            display: none;
-            z-index: 1;
+        /* ───────── Escenario (portada + carga + error) ───────── */
+        .stage {
+            position: absolute; inset: 0; z-index: 10; overflow: hidden;
+            transition: opacity .7s ease, visibility .7s;
+        }
+        .stage.out { opacity: 0; visibility: hidden; }
+
+        .bg { position: absolute; inset: 0; background: #07090b; }
+        .bg-img {
+            position: absolute; inset: -5%; background-size: cover; background-position: center;
+            opacity: 0; transition: opacity 1.3s ease; will-change: transform, opacity;
+        }
+        .bg-img.lo { filter: blur(16px) brightness(.8); }
+        .bg-img.on { opacity: 1; }
+        .bg-img.hi.on { animation: kenburns 30s ease-in-out infinite alternate; }
+        @keyframes kenburns {
+            from { transform: scale(1.03) translate3d(0, 0, 0); }
+            to   { transform: scale(1.16) translate3d(-1.6%, -1.1%, 0); }
+        }
+        .shade {
+            position: absolute; inset: 0;
+            background:
+                radial-gradient(120% 95% at 50% 42%, rgba(0,0,0,.12) 0%, rgba(0,0,0,.62) 68%, rgba(0,0,0,.92) 100%),
+                linear-gradient(180deg, rgba(0,0,0,.62) 0%, transparent 30%, transparent 52%, rgba(0,0,0,.9) 100%);
         }
 
-        /* ── Overlay ── */
-        .overlay-screen {
-            position: absolute;
-            inset: 0;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            z-index: 10;
-            transition: opacity 0.5s ease;
-            background: var(--overlay-bg);
-            padding: clamp(16px, 5vw, 40px);
+        /* Barra superior */
+        .top {
+            position: absolute; top: 0; left: 0; right: 0; z-index: 4;
+            display: flex; justify-content: space-between; align-items: center;
+            padding: max(clamp(8px, 2.2vh, 16px), env(safe-area-inset-top)) clamp(10px, 3vw, 22px) 0;
+        }
+        .brand {
+            display: flex; align-items: center; gap: .5em;
+            font-family: 'Bebas Neue', Impact, 'Arial Narrow', sans-serif;
+            letter-spacing: .2em; font-size: clamp(.82rem, 3.1vh, 1.2rem); opacity: .9;
+        }
+        .brand i { width: .5em; height: .5em; border-radius: 50%; background: var(--accent); box-shadow: 0 0 12px var(--accent); }
+        .badge {
+            font-size: clamp(.58rem, 2.3vh, .76rem); font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+            padding: .3em .85em; border-radius: 999px;
+            background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.18);
+            backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
         }
 
-        .backdrop-bg {
-            position: absolute;
-            inset: 0;
-            background-size: cover;
-            background-position: center;
-            filter: blur(15px) brightness(0.4);
-            transform: scale(1.1);
-            z-index: -1;
+        /* Centro: titulo, datos, play */
+        .center {
+            position: absolute; inset: 0; z-index: 3;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            gap: var(--gap); text-align: center;
+            padding: clamp(26px, 8vh, 56px) clamp(14px, 5vw, 56px) clamp(10px, 3vh, 28px);
+            transition: opacity .45s ease, transform .45s ease;
         }
+        .stage.busy .center, .stage.err .center { opacity: 0; transform: scale(.97); pointer-events: none; }
 
-        /* ── Meta info ── */
-        .meta-content {
-            text-align: center;
-            color: var(--text);
-            margin-bottom: var(--gap-meta);
-            max-width: min(85%, 680px);
-            animation: fadeIn 0.8s ease;
+        .logo {
+            display: none; max-height: clamp(34px, 21vh, 130px); max-width: min(78%, 440px);
+            object-fit: contain; filter: drop-shadow(0 4px 18px rgba(0,0,0,.75));
+            opacity: 0; transition: opacity .6s ease;
         }
-
-        .media-title {
-            font-size: var(--fs-title);
-            font-weight: bold;
-            text-shadow: 0 2px 10px rgba(0,0,0,0.8);
-            margin-bottom: 6px;
-            line-height: 1.2;
-            word-break: break-word;
-            hyphens: auto;
+        .logo.on { opacity: 1; }
+        .title {
+            font-family: 'Bebas Neue', Impact, 'Arial Narrow', sans-serif; font-weight: 400;
+            font-size: var(--fs-title); line-height: 1.04; letter-spacing: .02em;
+            text-shadow: 0 3px 18px rgba(0,0,0,.85); max-width: min(92%, 760px);
+            display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
         }
-
-        .episode-title {
-            font-size: var(--fs-ep);
-            color: var(--subtext);
-            margin-bottom: clamp(8px, 2vw, 15px);
-            font-weight: 400;
-            text-shadow: 0 2px 8px rgba(0,0,0,0.8);
-            word-break: break-word;
-            line-height: 1.4;
+        .skel {
+            color: transparent !important; text-shadow: none; border-radius: 8px; min-width: 46%;
+            background: linear-gradient(90deg, rgba(255,255,255,.06), rgba(255,255,255,.18), rgba(255,255,255,.06));
+            background-size: 220% 100%; animation: shimmer 1.3s linear infinite;
         }
+        @keyframes shimmer { from { background-position: 120% 0; } to { background-position: -120% 0; } }
 
-        .badges {
-            display: flex;
-            gap: clamp(6px, 1.5vw, 10px);
-            justify-content: center;
-            align-items: center;
-            flex-wrap: wrap;
+        .ep {
+            font-size: clamp(.72rem, 2.9vh, 1.05rem); color: var(--accent); font-weight: 700; letter-spacing: .04em;
+            text-shadow: 0 2px 10px rgba(0,0,0,.8); max-width: 92%;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         }
+        .ep[hidden], .logo[hidden], .syn[hidden] { display: none !important; }
 
-        .badge-lang {
-            background: var(--badge-bg);
-            color: white;
-            padding: clamp(3px, 0.8vw, 4px) clamp(8px, 2.5vw, 12px);
-            border-radius: 4px;
-            font-size: var(--fs-badge);
-            font-weight: bold;
-            text-transform: uppercase;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
-            white-space: nowrap;
+        .meta { display: flex; flex-wrap: wrap; justify-content: center; gap: clamp(4px, 1.2vh, 8px); max-width: 94%; }
+        .chip {
+            font-size: var(--fs-chip); font-weight: 500; line-height: 1; white-space: nowrap;
+            padding: .42em .8em; border-radius: 999px; color: var(--muted);
+            background: rgba(255,255,255,.09); border: 1px solid rgba(255,255,255,.12);
+            backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
         }
+        .chip.star { color: #ffd166; font-weight: 700; }
+        .chip.lang { color: #04100e; background: var(--accent); border-color: transparent; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
 
-        /* ── Play button ── */
-        #playContainer {
-            cursor: pointer;
+        .syn {
+            display: none; max-width: min(90%, 580px); color: var(--muted); font-size: var(--fs-syn); line-height: 1.5;
+            text-shadow: 0 2px 10px rgba(0,0,0,.9);
+            -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+        }
+        @media (min-height: 340px) { .syn { display: -webkit-box; } }
+
+        /* Boton play */
+        .play {
+            position: relative; width: var(--pb); height: var(--pb); border: 0; border-radius: 50%; cursor: pointer;
+            display: grid; place-items: center; color: #04100e; background: var(--accent);
+            box-shadow: 0 10px 44px rgba(var(--accent-rgb), .5), inset 0 0 0 1px rgba(255,255,255,.25);
+            transition: transform .25s ease, box-shadow .25s ease;
             -webkit-tap-highlight-color: transparent;
         }
-
-        .play-btn {
-            width: var(--btn-size);
-            height: var(--btn-size);
-            background: var(--accent);
-            border-radius: 50%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            box-shadow: 0 0 25px var(--accent-glow);
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
-            -webkit-tap-highlight-color: transparent;
+        .play::before, .play::after {
+            content: ""; position: absolute; inset: -9px; border-radius: 50%;
+            border: 2px solid rgba(var(--accent-rgb), .55); animation: ring 2.6s ease-out infinite; pointer-events: none;
         }
+        .play::after { animation-delay: 1.3s; }
+        @keyframes ring { 0% { transform: scale(.88); opacity: .85; } 100% { transform: scale(1.55); opacity: 0; } }
+        .play svg { width: 44%; height: 44%; fill: currentColor; margin-left: 7%; }
+        .play:hover { transform: scale(1.08); box-shadow: 0 14px 56px rgba(var(--accent-rgb), .7), inset 0 0 0 1px rgba(255,255,255,.3); }
+        .play:active { transform: scale(.95); }
+        .play:focus-visible { outline: 3px solid #fff; outline-offset: 4px; }
+        .hint { font-size: clamp(.68rem, 2.6vh, .9rem); letter-spacing: .06em; color: var(--muted); text-shadow: 0 2px 8px rgba(0,0,0,.9); }
+        @media (max-height: 239px) { .hint { display: none; } }
 
-        .play-btn:hover {
-            transform: scale(1.1);
-            box-shadow: 0 0 35px var(--accent-glow-strong);
+        /* Pantalla de carga */
+        .loader {
+            position: absolute; inset: 0; z-index: 3; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; gap: clamp(8px, 2.4vh, 18px);
+            opacity: 0; pointer-events: none; transition: opacity .45s ease;
         }
-
-        /* Touch: active state instead of hover for mobile */
-        #playContainer:active .play-btn {
-            transform: scale(0.95);
-            box-shadow: 0 0 15px var(--accent-glow);
+        .stage.busy .loader { opacity: 1; }
+        .stage.err .loader { opacity: 0; }
+        .ring {
+            width: clamp(34px, 12vh, 62px); height: clamp(34px, 12vh, 62px); border-radius: 50%;
+            border: 3px solid rgba(255,255,255,.12); border-top-color: var(--accent);
+            animation: spin .9s linear infinite; box-shadow: 0 0 28px rgba(var(--accent-rgb), .25);
         }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .ltitle { font-family: 'Bebas Neue', Impact, sans-serif; letter-spacing: .06em; font-size: clamp(.95rem, 4.6vh, 1.7rem); text-shadow: 0 2px 14px rgba(0,0,0,.9); max-width: 90%; text-align: center; }
+        .lstep { font-size: clamp(.68rem, 2.6vh, .92rem); color: var(--muted); min-height: 1.2em; }
+        .bar { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: rgba(255,255,255,.1); }
+        .bar i { display: block; height: 100%; width: 0; background: var(--accent); box-shadow: 0 0 14px var(--accent); }
+        .stage.busy .bar i { animation: fill 7s cubic-bezier(.1,.6,.2,1) forwards; }
+        .stage.done .bar i { animation: none; width: 100%; transition: width .3s ease; }
+        @keyframes fill { from { width: 0; } to { width: 86%; } }
 
-        .play-icon {
-            width: 0;
-            height: 0;
-            border-top: var(--btn-icon-top) solid transparent;
-            border-bottom: var(--btn-icon-bottom) solid transparent;
-            border-left: var(--btn-icon-left) solid #fff;
-            margin-left: var(--btn-icon-margin);
+        /* Error / lentitud */
+        .errbox {
+            position: absolute; inset: 0; z-index: 5; display: none; flex-direction: column;
+            align-items: center; justify-content: center; gap: clamp(6px, 2vh, 14px);
+            padding: clamp(14px, 4vh, 36px); text-align: center; background: rgba(5,5,5,.62);
+            backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
         }
-
-        /* ── Status / spinner / error ── */
-        .status-text {
-            color: var(--text);
-            margin-top: clamp(14px, 3.5vw, 25px);
-            font-size: var(--fs-status);
-            text-shadow: 0 2px 5px rgba(0,0,0,0.5);
-            text-align: center;
+        .stage.err .errbox { display: flex; }
+        .errbox svg { width: clamp(26px, 9vh, 46px); height: clamp(26px, 9vh, 46px); fill: var(--error); }
+        .errbox h2 { font-size: clamp(.95rem, 4vh, 1.4rem); font-weight: 700; }
+        .errbox p { font-size: clamp(.7rem, 2.7vh, .95rem); color: var(--muted); max-width: 440px; line-height: 1.45; }
+        .errbox p:empty { display: none; }
+        .retry {
+            margin-top: 2px; padding: .65em 1.5em; border: 0; border-radius: 999px; cursor: pointer;
+            font: 700 clamp(.72rem, 2.8vh, .95rem) 'DM Sans', sans-serif; color: #04100e; background: var(--accent);
+            box-shadow: 0 8px 28px rgba(var(--accent-rgb), .4);
         }
+        .retry[hidden] { display: none; }
+        .retry:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
 
-        .spinner {
-            display: none;
-            width: clamp(28px, 7vw, 40px);
-            height: clamp(28px, 7vw, 40px);
-            border: 4px solid rgba(255,255,255,0.1);
-            border-radius: 50%;
-            border-top-color: var(--accent);
-            animation: spin 1s linear infinite;
-            margin-bottom: clamp(10px, 2.5vw, 15px);
+        /* Aviso "Reproduciendo" sobre el video */
+        .toast {
+            position: absolute; top: max(10px, env(safe-area-inset-top)); left: 10px; z-index: 20; max-width: 80%;
+            display: flex; align-items: center; gap: .6em; padding: .5em 1em .5em .8em; border-radius: 999px;
+            font-size: clamp(.66rem, 2.6vh, .86rem); font-weight: 500; pointer-events: none;
+            background: rgba(8,8,8,.78); border: 1px solid rgba(255,255,255,.14);
+            backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+            opacity: 0; transform: translateY(-8px); transition: opacity .4s ease, transform .4s ease;
         }
+        .toast.on { opacity: 1; transform: none; }
+        .toast i { width: .55em; height: .55em; border-radius: 50%; background: var(--accent); box-shadow: 0 0 10px var(--accent); flex-shrink: 0; }
+        .toast span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-        .error-msg {
-            color: var(--error);
-            display: none;
-            text-align: center;
-            font-size: clamp(0.85rem, 2.5vw, 1.1rem);
-            padding: 0 16px;
-        }
-
-        /* ── Animations ── */
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(-10px); }
-            to   { opacity: 1; transform: translateY(0); }
-        }
-
-        /* ── Portrait phones: tighter layout ── */
-        @media (max-width: 480px) and (orientation: portrait) {
-            .overlay-screen {
-                justify-content: center;
-                gap: 0;
-            }
-            .meta-content {
-                max-width: 92%;
-            }
-        }
-
-        /* ── Landscape phones: shrink vertical gaps ── */
-        @media (max-height: 420px) {
-            .overlay-screen {
-                justify-content: center;
-                padding-top: 10px;
-                padding-bottom: 10px;
-            }
-            .meta-content {
-                margin-bottom: 10px;
-            }
-            .status-text {
-                margin-top: 8px;
-            }
+        @media (prefers-reduced-motion: reduce) {
+            .bg-img.hi.on, .play::before, .play::after, .ring, .skel { animation: none !important; }
+            .stage, .center, .bg-img { transition: none; }
         }
     </style>
 </head>
 <body>
 
-    <div class="container">
-        <div id="overlay" class="overlay-screen">
-            <div id="backdrop" class="backdrop-bg"></div>
-            <div id="spinner" class="spinner"></div>
-
-            <div id="metaContent" class="meta-content" style="display:none;">
-                <h1 id="mediaTitle" class="media-title">Cargando...</h1>
-                <div id="episodeTitle" class="episode-title" style="display:none;"></div>
-                <div class="badges">
-                    <span class="badge-lang">Español</span>
-                </div>
-            </div>
-
-            <div id="playContainer" onclick="procesarVideo()" style="display:none;">
-                <div class="play-btn">
-                    <div class="play-icon"></div>
-                </div>
-            </div>
-
-            <div id="status" class="status-text">Cargando información...</div>
-            <div id="error" class="error-msg"><h2>Enlace no disponible</h2></div>
+    <div id="stage" class="stage">
+        <div class="bg">
+            <div id="bgLo" class="bg-img lo"></div>
+            <div id="bgHi" class="bg-img hi"></div>
+            <div class="shade"></div>
         </div>
 
-        <iframe id="player" allowfullscreen allow="autoplay; encrypted-media"></iframe>
+        <div class="top">
+            <div class="brand"><i></i>CINEWICK</div>
+            <div id="badge" class="badge"></div>
+        </div>
+
+        <main id="center" class="center">
+            <img id="logo" class="logo" alt="" hidden>
+            <h1 id="title" class="title skel">&nbsp;</h1>
+            <div id="ep" class="ep" hidden></div>
+            <div id="meta" class="meta"></div>
+            <p id="syn" class="syn" hidden></p>
+            <button id="play" class="play" type="button" aria-label="">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+            </button>
+            <div id="hint" class="hint"></div>
+        </main>
+
+        <div class="loader" aria-live="polite">
+            <div class="ring"></div>
+            <div id="ltitle" class="ltitle"></div>
+            <div id="lstep" class="lstep"></div>
+        </div>
+        <div class="bar"><i></i></div>
+
+        <div id="errbox" class="errbox" role="alert">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>
+            <h2 id="errTitle"></h2>
+            <p id="errText"></p>
+            <button id="retry" class="retry" type="button" hidden></button>
+        </div>
     </div>
 
+    <iframe id="player" allowfullscreen allow="autoplay; fullscreen; picture-in-picture; encrypted-media"></iframe>
+    <div id="toast" class="toast" aria-hidden="true"><i></i><span id="toastText"></span></div>
+
     <script>
-        const TMDB_API_KEY = '51800c8d9e13631a7ded6f17f363e7a5';
-        let urlDecodificada = "";
+    (function () {
+        'use strict';
 
-        async function inicializar() {
-            const hashRaw = window.location.hash.substring(1);
-            const partes = hashRaw.split('-');
+        /* ═══ Configuracion de esta version (ES / EN) ═══ */
+        var CFG = {"lang": "es", "tmdbLang": "es-MX", "imgLangs": "es,es-419,en,null", "certOrder": ["MX", "ES", "US"], "badge": "Español", "t": {"play": "Reproducir", "tap": "Toca para reproducir", "steps": ["Conectando…", "Preparando el reproductor…", "Casi listo…"], "now": "Reproduciendo", "retry": "Reintentar", "badLink": "Enlace no disponible", "unknown": "Estructura de enlace no reconocida.", "corrupt": "El enlace de video está corrupto o incompleto.", "blocked": "Servidor no permitido.", "slow": "Este servidor está tardando", "slowHint": "Reintenta o prueba otro servidor desde el menú del reproductor.", "available": "Video disponible", "s": "T", "e": "E"}};
 
-            if (partes.length === 5) {
-                const [tipo, tmdbId, temporada, episodio, base64Url] = partes;
-                procesarParametros(base64Url, () => obtenerDatosEpisodioTMDB(tmdbId, temporada, episodio));
-            } else if (partes.length === 3) {
-                const [tipo, tmdbId, base64Url] = partes;
-                procesarParametros(base64Url, () => obtenerDatosGeneralesTMDB(tipo, tmdbId));
+        var TMDB_API_KEY = '51800c8d9e13631a7ded6f17f363e7a5';
+        var MIN_MS = 900;                 /* tiempo minimo de pantalla de carga (se siente mas fluido) */
+        var DEFAULT_TIMEOUT_S = 15;       /* si el servidor no carga en este tiempo, avisa y ofrece reintentar */
+        /* true = solo estos servidores pueden abrirse desde este reproductor */
+        var STRICT_HOSTS = false;
+        var ALLOWED_HOSTS = ['vimeus.com', 'embed69.org', 'unlimplay.com'];
+
+        function $(id) { return document.getElementById(id); }
+        var qs = new URLSearchParams(location.search);
+        var T = CFG.t;
+        var S = { url: '', tipo: 'movie', id: '', season: '', episode: '', title: '', started: false, loaded: false, t0: 0 };
+        var timers = { fail: 0, step: [] };
+
+        /* ═══ Mensajes al sitio (para que el tema reaccione) ═══ */
+        function emit(state, extra) {
+            try {
+                var msg = { source: 'cw-player', state: state, tipo: S.tipo, id: S.id, season: S.season, episode: S.episode, title: S.title };
+                if (extra) for (var k in extra) msg[k] = extra[k];
+                window.parent.postMessage(msg, '*');
+            } catch (e) {}
+        }
+
+        /* ═══ Color de acento que manda el tema (?c=RRGGBB) ═══ */
+        (function () {
+            var c = qs.get('c');
+            if (c && /^[0-9a-f]{6}$/i.test(c)) {
+                var r = parseInt(c.slice(0, 2), 16), g = parseInt(c.slice(2, 4), 16), b = parseInt(c.slice(4, 6), 16);
+                var st = document.documentElement.style;
+                st.setProperty('--accent', '#' + c);
+                st.setProperty('--accent-rgb', r + ', ' + g + ', ' + b);
+            }
+        })();
+
+        /* ═══ Textos fijos ═══ */
+        $('badge').textContent = CFG.badge;
+        $('play').setAttribute('aria-label', T.play);
+        $('hint').textContent = T.tap;
+
+        /* ═══ Utilidades ═══ */
+        function el(tag, cls, text) {
+            var n = document.createElement(tag);
+            if (cls) n.className = cls;
+            if (text != null) n.textContent = text;
+            return n;
+        }
+        function fmtRuntime(m) {
+            m = parseInt(m, 10);
+            if (!m || m < 1) return '';
+            var h = Math.floor(m / 60), mm = m % 60;
+            return h ? (mm ? h + ' h ' + mm + ' min' : h + ' h') : mm + ' min';
+        }
+        function pad(n) { return String(n); }
+        function preload(url) {
+            return new Promise(function (res) {
+                var i = new Image();
+                i.onload = function () { res(url); };
+                i.onerror = function () { res(null); };
+                i.src = url;
+            });
+        }
+        function tmdb(path) {
+            var ctl = ('AbortController' in window) ? new AbortController() : null;
+            var to = setTimeout(function () { if (ctl) ctl.abort(); }, 9000);
+            var url = 'https://api.themoviedb.org/3' + path + (path.indexOf('?') > -1 ? '&' : '?') + 'api_key=' + TMDB_API_KEY;
+            return fetch(url, ctl ? { signal: ctl.signal } : undefined)
+                .then(function (r) { return r.ok ? r.json() : null; })
+                .catch(function () { return null; })
+                .then(function (d) { clearTimeout(to); return d; });
+        }
+
+        /* ═══ Errores ═══ */
+        function showError(title, text, canRetry) {
+            clearTimeout(timers.fail);
+            timers.step.forEach(clearTimeout); timers.step = [];
+            var st = $('stage');
+            st.classList.remove('busy', 'out', 'done');
+            st.classList.add('err');
+            $('errTitle').textContent = title;
+            $('errText').textContent = text || '';
+            var rb = $('retry');
+            rb.hidden = !canRetry;
+            rb.textContent = T.retry;
+            $('play').style.display = 'none';
+        }
+
+        /* ═══ 1) Leer el enlace (#tipo-id-b64  o  #tv-id-temp-ep-b64) ═══ */
+        function parseHash() {
+            var parts = location.hash.substring(1).split('-');
+            var b64;
+            if (parts.length === 5) {
+                S.tipo = parts[0]; S.id = parts[1]; S.season = parts[2]; S.episode = parts[3]; b64 = parts[4];
+            } else if (parts.length === 3) {
+                S.tipo = parts[0]; S.id = parts[1]; b64 = parts[2];
             } else {
-                mostrarError("Estructura de enlace no reconocida.");
+                return T.unknown;
             }
+            if (S.tipo !== 'movie' && S.tipo !== 'tv') S.tipo = parts.length === 5 ? 'tv' : 'movie';
+            if (!/^\d+$/.test(S.id)) return T.unknown;
+            var real;
+            try { real = atob(b64); } catch (e) { return T.corrupt; }
+            if (!/^https?:\/\//i.test(real)) return T.corrupt;
+            if (STRICT_HOSTS) {
+                var host = '';
+                try { host = new URL(real).hostname.toLowerCase(); } catch (e2) { return T.corrupt; }
+                var okHost = ALLOWED_HOSTS.some(function (h) { return host === h || host.slice(-(h.length + 1)) === '.' + h; });
+                if (!okHost) return T.blocked;
+            }
+            S.url = real;
+            return '';
         }
 
-        function procesarParametros(base64Url, funcionTMDB) {
+        /* Conexion anticipada al servidor de video: arranca mas rapido al tocar play */
+        function preconnect(url) {
             try {
-                const urlReal = atob(base64Url);
-                if (urlReal.startsWith('http://') || urlReal.startsWith('https://')) {
-                    urlDecodificada = urlReal;
-                } else {
-                    throw new Error();
-                }
-
-                funcionTMDB().then(() => {
-                    document.getElementById('playContainer').style.display = 'flex';
-                    document.getElementById('metaContent').style.display = 'block';
-                    document.getElementById('status').innerText = "Haz clic para reproducir";
-                }).catch(() => {
-                    document.getElementById('mediaTitle').innerText = "Video Disponible";
-                    document.getElementById('playContainer').style.display = 'flex';
-                    document.getElementById('metaContent').style.display = 'block';
-                    document.getElementById('status').innerText = "Haz clic para reproducir";
+                var origin = new URL(url).origin;
+                ['preconnect', 'dns-prefetch'].forEach(function (rel) {
+                    var l = document.createElement('link');
+                    l.rel = rel; l.href = origin;
+                    if (rel === 'preconnect') l.crossOrigin = '';
+                    document.head.appendChild(l);
                 });
+            } catch (e) {}
+        }
 
-            } catch (e) {
-                console.error("Error decodificando el enlace:", e);
-                mostrarError("El enlace de video está corrupto o incompleto.");
+        /* ═══ 2) Datos de TMDB (se rellenan sin bloquear el play) ═══ */
+        function pickLogo(images) {
+            var logos = (images && images.logos) || [];
+            if (!logos.length) return null;
+            var pref = [CFG.lang, 'en', null];
+            for (var i = 0; i < pref.length; i++) {
+                var cand = logos.filter(function (l) { return (l.iso_639_1 || null) === pref[i]; });
+                if (cand.length) {
+                    cand.sort(function (a, b) { return (b.vote_average || 0) - (a.vote_average || 0); });
+                    return cand[0].file_path;
+                }
+            }
+            return logos[0].file_path;
+        }
+        function pickCert(d) {
+            var order = CFG.certOrder, i, j, res, r;
+            if (d.release_dates && d.release_dates.results) {
+                res = d.release_dates.results;
+                for (i = 0; i < order.length; i++) {
+                    for (j = 0; j < res.length; j++) {
+                        if (res[j].iso_3166_1 === order[i]) {
+                            r = (res[j].release_dates || []).filter(function (x) { return x.certification; })[0];
+                            if (r) return r.certification;
+                        }
+                    }
+                }
+            }
+            if (d.content_ratings && d.content_ratings.results) {
+                res = d.content_ratings.results;
+                for (i = 0; i < order.length; i++) {
+                    r = res.filter(function (x) { return x.iso_3166_1 === order[i] && x.rating; })[0];
+                    if (r) return r.rating;
+                }
+            }
+            return '';
+        }
+
+        function applyMeta(d, ep) {
+            var title = d.title || d.name || '';
+            if (title) {
+                S.title = title;
+                var h = $('title');
+                h.classList.remove('skel');
+                h.textContent = title;
+                document.title = title;
+                $('ltitle').textContent = title;
+            }
+
+            /* Logo oficial (si existe) reemplaza al texto */
+            var lp = pickLogo(d.images);
+            if (lp) {
+                preload('https://image.tmdb.org/t/p/w500' + lp).then(function (u) {
+                    if (!u) return;
+                    var lg = $('logo');
+                    lg.alt = title; lg.src = u; lg.hidden = false; lg.style.display = 'block';
+                    $('title').style.display = 'none';
+                    requestAnimationFrame(function () { lg.classList.add('on'); });
+                });
+            }
+
+            /* Episodio */
+            if (ep && (ep.name || S.episode)) {
+                var line = T.s + S.season + ' · ' + T.e + S.episode + (ep.name ? ' — ' + ep.name : '');
+                var epEl = $('ep');
+                epEl.textContent = line; epEl.hidden = false;
+            }
+
+            /* Chips */
+            var meta = $('meta');
+            meta.textContent = '';
+            var va = ep && ep.vote_average > 0 ? ep.vote_average : d.vote_average;
+            if (va && va > 0) meta.appendChild(el('span', 'chip star', '★ ' + Number(va).toFixed(1)));
+            var date = d.release_date || d.first_air_date || '';
+            if (date) meta.appendChild(el('span', 'chip', date.slice(0, 4)));
+            var rt = ep && ep.runtime ? ep.runtime : (d.runtime || (d.episode_run_time && d.episode_run_time[0]));
+            var rts = fmtRuntime(rt);
+            if (rts) meta.appendChild(el('span', 'chip', rts));
+            var cert = pickCert(d);
+            if (cert) meta.appendChild(el('span', 'chip', cert));
+            (d.genres || []).slice(0, 2).forEach(function (g) { meta.appendChild(el('span', 'chip', g.name)); });
+
+            /* Sinopsis */
+            var syn = (ep && ep.overview) || d.overview || '';
+            if (syn) { var se = $('syn'); se.textContent = syn; se.hidden = false; }
+
+            /* Fondo: version chica borrosa al instante, la grande entra encima */
+            var small = Math.min(window.innerWidth || 800, (window.screen && window.screen.width) || 800) <= 780;
+            var bd = d.backdrop_path || (ep && ep.still_path) || d.poster_path;
+            if (bd) {
+                preload('https://image.tmdb.org/t/p/w300' + bd).then(function (u) {
+                    if (u) { $('bgLo').style.backgroundImage = 'url("' + u + '")'; $('bgLo').classList.add('on'); }
+                });
+                preload('https://image.tmdb.org/t/p/' + (small ? 'w780' : 'w1280') + bd).then(function (u) {
+                    if (u) { $('bgHi').style.backgroundImage = 'url("' + u + '")'; $('bgHi').classList.add('on'); }
+                });
             }
         }
 
-        async function obtenerDatosGeneralesTMDB(tipo, id) {
-            const url = `https://api.themoviedb.org/3/${tipo}/${id}?api_key=${TMDB_API_KEY}&language=es-ES`;
-            try {
-                const respuesta = await fetch(url);
-                if (!respuesta.ok) return;
-                const datos = await respuesta.json();
-                document.getElementById('mediaTitle').innerText = datos.title || datos.name;
-                if (datos.backdrop_path) {
-                    document.getElementById('backdrop').style.backgroundImage = `url('https://image.tmdb.org/t/p/w1280${datos.backdrop_path}')`;
-                }
-            } catch (error) { console.log(error); }
-        }
-
-        async function obtenerDatosEpisodioTMDB(idSerie, temp, ep) {
-            const urlEpisodio = `https://api.themoviedb.org/3/tv/${idSerie}/season/${temp}/episode/${ep}?api_key=${TMDB_API_KEY}&language=es-ES`;
-            const urlSerie    = `https://api.themoviedb.org/3/tv/${idSerie}?api_key=${TMDB_API_KEY}&language=es-ES`;
-            try {
-                const [resEp, resSerie] = await Promise.all([fetch(urlEpisodio), fetch(urlSerie)]);
-                if (resEp.ok) {
-                    const datosEp = await resEp.json();
-                    document.getElementById('mediaTitle').innerText = `T${temp} × E${ep}`;
-                    if (datosEp.name) {
-                        const epTitleDiv = document.getElementById('episodeTitle');
-                        epTitleDiv.innerText = datosEp.name;
-                        epTitleDiv.style.display = 'block';
+        function loadMeta() {
+            var L = CFG.tmdbLang, imgs = '&append_to_response=images,' + (S.tipo === 'movie' ? 'release_dates' : 'content_ratings') + '&include_image_language=' + CFG.imgLangs;
+            var base = '/' + (S.tipo === 'movie' ? 'movie' : 'tv') + '/' + S.id + '?language=' + L + imgs;
+            var pBase = tmdb(base);
+            var pEp = (S.tipo === 'tv' && S.season && S.episode)
+                ? tmdb('/tv/' + S.id + '/season/' + S.season + '/episode/' + S.episode + '?language=' + L) : Promise.resolve(null);
+            return Promise.all([pBase, pEp]).then(function (r) {
+                var d = r[0], ep = r[1];
+                if (!d) { if (!S.title) { var h = $('title'); h.classList.remove('skel'); h.textContent = T.available; } return; }
+                /* Si falta la sinopsis en este idioma, se completa con ingles */
+                var needFb = L.slice(0, 2) !== 'en' && (!d.overview || (ep && !ep.overview && !d.overview));
+                if (!needFb) return applyMeta(d, ep);
+                var fbPath = '/' + (S.tipo === 'movie' ? 'movie' : 'tv') + '/' + S.id + '?language=en-US';
+                return tmdb(fbPath).then(function (fb) {
+                    if (fb) {
+                        if (!d.overview) d.overview = fb.overview;
+                        if (!d.title && !d.name) { d.title = fb.title; d.name = fb.name; }
                     }
-                }
-                if (resSerie.ok) {
-                    const datosSerie = await resSerie.json();
-                    const titleEl = document.getElementById('mediaTitle');
-                    if (titleEl.innerText === "Cargando...") {
-                        titleEl.innerText = datosSerie.name;
-                    } else {
-                        titleEl.innerText = `${datosSerie.name} (${titleEl.innerText})`;
-                    }
-                    if (datosSerie.backdrop_path) {
-                        document.getElementById('backdrop').style.backgroundImage = `url('https://image.tmdb.org/t/p/w1280${datosSerie.backdrop_path}')`;
-                    }
-                }
-            } catch (error) { console.log(error); }
+                    applyMeta(d, ep);
+                });
+            });
         }
 
-        function procesarVideo() {
-            if (!urlDecodificada) return;
-            document.getElementById('playContainer').style.display = 'none';
-            document.getElementById('metaContent').style.display = 'none';
-            document.getElementById('spinner').style.display = 'block';
-            document.getElementById('status').innerText = "Generando entorno seguro...";
-
-            setTimeout(() => {
-                const iframe  = document.getElementById('player');
-                const overlay = document.getElementById('overlay');
-                iframe.src = urlDecodificada;
-                iframe.style.display = 'block';
-                overlay.style.opacity = '0';
-                setTimeout(() => { overlay.style.display = 'none'; }, 500);
-            }, 1300);
+        /* ═══ 3) Reproducir ═══ */
+        function startTimeout() {
+            var s = parseFloat(qs.get('to'));
+            if (!(s >= 1 && s <= 120)) s = DEFAULT_TIMEOUT_S;
+            clearTimeout(timers.fail);
+            timers.fail = setTimeout(function () {
+                if (S.loaded) return;
+                showError(T.slow, T.slowHint, true);
+                emit('timeout');
+            }, s * 1000);
         }
 
-        function mostrarError(msg) {
-            document.getElementById('playContainer').style.display = 'none';
-            document.getElementById('metaContent').style.display = 'none';
-            document.getElementById('spinner').style.display = 'none';
-            document.getElementById('status').style.display = 'none';
-            if (msg) document.getElementById('error').innerHTML = `<h2>${msg}</h2>`;
-            document.getElementById('error').style.display = 'block';
+        function start() {
+            if (S.started || !S.url) return;
+            S.started = true; S.loaded = false; S.t0 = Date.now();
+            var st = $('stage');
+            st.classList.remove('err', 'out', 'done');
+            st.classList.add('busy');
+            $('lstep').textContent = T.steps[0];
+            timers.step.forEach(clearTimeout);
+            timers.step = [
+                setTimeout(function () { $('lstep').textContent = T.steps[1]; }, 1400),
+                setTimeout(function () { $('lstep').textContent = T.steps[2]; }, 4200)
+            ];
+            var f = $('player');
+            f.style.display = 'block';
+            f.src = S.url;
+            startTimeout();
+            emit('play');
         }
 
-        window.onload = inicializar;
+        function reveal() {
+            var st = $('stage');
+            clearTimeout(timers.fail);
+            timers.step.forEach(clearTimeout); timers.step = [];
+            st.classList.add('done');
+            setTimeout(function () { st.classList.add('out'); }, 260);
+            var tx = $('toastText');
+            tx.textContent = T.now + ' · ' + (S.title || '') + (S.episode ? ' · ' + T.s + S.season + T.e + S.episode : '');
+            var tt = $('toast');
+            setTimeout(function () { tt.classList.add('on'); }, 600);
+            setTimeout(function () { tt.classList.remove('on'); }, 4600);
+            emit('loaded');
+        }
+
+        $('player').addEventListener('load', function () {
+            var src = this.getAttribute('src');
+            if (!S.started || S.loaded || !src || src === 'about:blank') return;
+            S.loaded = true;
+            setTimeout(reveal, Math.max(0, MIN_MS - (Date.now() - S.t0)));
+        });
+
+        function retry() {
+            var f = $('player');
+            S.started = false; S.loaded = false;
+            f.src = 'about:blank';
+            setTimeout(start, 80);
+        }
+
+        $('play').addEventListener('click', start);
+        $('retry').addEventListener('click', retry);
+
+        /* ═══ Inicio ═══ */
+        var bad = parseHash();
+        if (bad) {
+            $('title').classList.remove('skel');
+            $('title').textContent = '';
+            showError(T.badLink, bad, false);
+            emit('error', { reason: bad });
+        } else {
+            preconnect(S.url);
+            emit('ready');
+            loadMeta();
+            var a = qs.get('a');
+            if (a === '1' || a === 'true') { $('ltitle').textContent = $('ltitle').textContent || ''; start(); }
+        }
+    })();
     </script>
 </body>
 </html>
