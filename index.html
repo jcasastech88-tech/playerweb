@@ -264,7 +264,7 @@
         </div>
     </div>
 
-    <iframe id="player" allowfullscreen allow="autoplay; fullscreen; picture-in-picture; encrypted-media"></iframe>
+    <iframe id="player" allowfullscreen allow="autoplay; fullscreen; picture-in-picture; encrypted-media" referrerpolicy="origin></iframe>
     <div id="toast" class="toast" aria-hidden="true"><i></i><span id="toastText"></span></div>
 
     <script>
@@ -279,7 +279,7 @@
         var DEFAULT_TIMEOUT_S = 15;       /* si el servidor no carga en este tiempo, avisa y ofrece reintentar */
         /* true = solo estos servidores pueden abrirse desde este reproductor */
         var STRICT_HOSTS = false;
-        var ALLOWED_HOSTS = ['vimeus.com', 'embed69.org', 'unlimplay.com'];
+        var ALLOWED_HOSTS = ['vimeus.net', 'embed69.org', 'unlimplay.com'];
 
         function $(id) { return document.getElementById(id); }
         var qs = new URLSearchParams(location.search);
